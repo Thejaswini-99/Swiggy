@@ -8,22 +8,16 @@ import (
 )
 
 type order struct {
-	Id       int    `json:"id"`
-	Item     string `json:"item"`
-	Customer string `json:"customer"`
-	Status   string `json:"status"`
-}
-
-var ordersList = []order{
-	{1, "Pizza", "Thejaswini", "Pending"},
-	{2, "Burger", "Khushi", "Completed"},
-	{3, "Chicken", "Veera", "Completed"},
+	Id     int    `json:"id"`
+	Name   string `json:"name"`
+	Item   string `json:"item"`
+	Status string `json:"status"`
 }
 
 func main() {
-
-	http.HandleFunc("/getOrders", getOrder)
-	http.HandleFunc("/getOrdersbyId", getOrderbyId)
+	initDB()
+	http.HandleFunc("/getOrders", getOrders)
+	http.HandleFunc("/getOrderbyID", getOrdersbyID)
 	http.HandleFunc("/createOrder", createOrder)
 	http.HandleFunc("/updateOrder", updateOrder)
 	http.HandleFunc("/deleteOrder", deleteOrder)
@@ -31,101 +25,109 @@ func main() {
 
 }
 
-func deleteOrder(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "DELETE" {
-		fmt.Fprintf(w, "Only DELETE method is allowed")
+func getOrders(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintf(w, "Please use the GET Method")
 		return
 	}
-	idstr := r.URL.Query().Get("id")
-
-	id, err := strconv.Atoi(idstr)
+	row, err := db.Query("Select Id,Name,Item,Status from orders")
 	if err != nil {
-		fmt.Fprintf(w, "Id is required to update the order")
+		fmt.Fprintf(w, "Error fetching orders")
 		return
 	}
+	defer row.Close()
 
-	for i, val := range ordersList {
-		if val.Id == id {
-			ordersList = append(ordersList[:i], ordersList[i+1:]...)
-			fmt.Fprint(w, "Order Deleted!")
-			return
-		}
+	var orderList []order
+	for row.Next() {
+		var o order
+		row.Scan(&o.Id, &o.Name, &o.Item, &o.Status)
+		orderList = append(orderList, o)
 	}
-	fmt.Fprint(w, "Order not Deleted as the given id was not found in the list!")
+
+	w.Header().Set("content-type", "application/json")
+	json.NewEncoder(w).Encode(orderList)
 
 }
-
-func updateOrder(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "PUT" {
-		fmt.Fprintf(w, "Only PUT method is allowed")
-		return
-	}
-	var updateOrder order
-	idstr := r.URL.Query().Get("id")
+func getOrdersbyID(w http.ResponseWriter, r *http.Request) {
+	idstr := r.URL.Query().Get("Id")
 
 	id, err := strconv.Atoi(idstr)
 	if err != nil {
-		fmt.Fprintf(w, "Id is required to update the order")
+		fmt.Fprintf(w, "Please enter the id to fetch")
 		return
 	}
-	json.NewDecoder(r.Body).Decode(&updateOrder)
-
-	for i, val := range ordersList {
-		if val.Id == id {
-			ordersList[i] = updateOrder
-			fmt.Fprint(w, "Order Updated!")
-			return
-		}
+	var o order
+	err = db.QueryRow("Select Id,Name,Item,Status from orders where id = ? ", id).Scan(&o.Id, &o.Name, &o.Item, &o.Status)
+	if err != nil {
+		fmt.Fprintf(w, "Error fetching orders")
+		return
 	}
-	fmt.Fprint(w, "Order not Updated!")
+
+	w.Header().Set("content-type", "application/json")
+	json.NewEncoder(w).Encode(o)
+
+	fmt.Fprintf(w, "Order Id Fetched")
 
 }
 
 func createOrder(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		fmt.Fprintf(w, "Only POST method is allowed")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintf(w, "Please use the POST Method")
 		return
 	}
 	var newOrder order
 
+	w.Header().Set("content-type", "application/json")
 	err := json.NewDecoder(r.Body).Decode(&newOrder)
+
 	if err != nil {
-		fmt.Fprintf(w, "Request Body not Found")
-		return
+		fmt.Fprintf(w, "Not able to decode the value")
 	}
-	ordersList = append(ordersList, newOrder)
-	fmt.Fprintf(w, "Hey! Updated the Order")
+	_, err = db.Exec("INSERT INTO orders (name, item, status) VALUES (?, ?, ?)",
+		newOrder.Name, newOrder.Item, newOrder.Status)
+
+	//orders = append(orders, newOrder)
+	fmt.Fprintf(w, "New Order Created")
 
 }
 
-func getOrderbyId(w http.ResponseWriter, r *http.Request) {
-	idstr := r.URL.Query().Get("id")
-
+func updateOrder(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "PUT" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintf(w, "Please use the POST Method")
+		return
+	}
+	idstr := r.URL.Query().Get("Id")
 	id, err := strconv.Atoi(idstr)
 	if err != nil {
-		fmt.Fprintf(w, "Id should be needed to fetch the order")
-		return
+		fmt.Fprintf(w, "Please enter the proper id to update")
 	}
 
-	for _, val := range ordersList {
-		if id == val.Id {
-			json.NewEncoder(w).Encode(val)
-			return
-		}
+	var newOrder order
 
-	}
+	err = json.NewDecoder(r.Body).Decode(&newOrder)
 
-	fmt.Fprintf(w, "Order Not FOund")
+	_, err = db.Exec("update orders set name= ?,item=?,status=? where id=?", newOrder.Name, newOrder.Item, newOrder.Status, id)
+
+	fmt.Fprintf(w, "Order got updated")
 
 }
 
-func getOrder(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+func deleteOrder(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "DELETE" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintf(w, "Only Get Method is allowed")
+		fmt.Fprintf(w, "Please use the DELETE Method")
 		return
 	}
+	idstr := r.URL.Query().Get("Id")
+	id, err := strconv.Atoi(idstr)
+	if err != nil {
+		fmt.Fprintf(w, "Please enter the proper id to update")
+	}
+	_, err = db.Exec("delete from orders where id=?", id)
 
-	w.Header().Set("Context-Type", "application/json")
-	json.NewEncoder(w).Encode(ordersList)
+	fmt.Fprintf(w, "Order got Deleted")
+
 }
