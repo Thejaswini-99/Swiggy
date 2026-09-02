@@ -16,11 +16,13 @@ type order struct {
 
 func main() {
 	initDB()
-	http.HandleFunc("/getOrders", getOrders)
-	http.HandleFunc("/getOrderbyID", getOrdersbyID)
-	http.HandleFunc("/createOrder", createOrder)
-	http.HandleFunc("/updateOrder", updateOrder)
-	http.HandleFunc("/deleteOrder", deleteOrder)
+	http.HandleFunc("/getOrders", corsMiddleware(authMiddleware(getOrders)))
+	http.HandleFunc("/getOrderbyID", corsMiddleware(authMiddleware(getOrdersbyID)))
+	http.HandleFunc("/createOrder", corsMiddleware(authMiddleware(createOrder)))
+	http.HandleFunc("/updateOrder", corsMiddleware(authMiddleware(updateOrder)))
+	http.HandleFunc("/deleteOrder", corsMiddleware(authMiddleware(deleteOrder)))
+	http.HandleFunc("/register", corsMiddleware(register))
+	http.HandleFunc("/login", corsMiddleware(login))
 	http.ListenAndServe(":8080", nil)
 
 }
