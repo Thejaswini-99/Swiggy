@@ -104,11 +104,5 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, token)
-
-	// 1. decode request body → get username, password
-	// 2. fetch user from DB by username
-	// 3. compare password
-	// 4. generate JWT token
-	// 5. return token
+	fmt.Fprint(w, token)
 }

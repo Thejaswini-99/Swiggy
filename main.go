@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type order struct {
@@ -16,6 +17,7 @@ type order struct {
 
 func main() {
 	initDB()
+	initRedis()
 	http.HandleFunc("/getOrders", corsMiddleware(rateLimitMiddleware(authMiddleware(getOrders))))
 	http.HandleFunc("/getOrderbyID", corsMiddleware(authMiddleware(getOrdersbyID)))
 	http.HandleFunc("/createOrder", corsMiddleware(authMiddleware(createOrder)))
@@ -34,6 +36,15 @@ func getOrders(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Please use the GET Method")
 		return
 	}
+	cached, err := rdb.Get(ctx, "orders").Result()
+	if err == nil {
+		fmt.Println("CacheHit- Retiring from the redis")
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, "%s", cached)
+		return
+	}
+
+	fmt.Println("CacheMiss - Querring the sql")
 	row, err := db.Query("Select Id,Name,Item,Status from orders")
 	if err != nil {
 		fmt.Fprintf(w, "Error fetching orders")
@@ -46,6 +57,12 @@ func getOrders(w http.ResponseWriter, r *http.Request) {
 		var o order
 		row.Scan(&o.Id, &o.Name, &o.Item, &o.Status)
 		orderList = append(orderList, o)
+	}
+	data, err := json.Marshal(orderList)
+	if err == nil {
+		rdb.Set(ctx, "orders", string(data), 10*time.Minute)
+		fmt.Println("Stored in Redis Cache")
+
 	}
 
 	w.Header().Set("content-type", "application/json")

@@ -62,8 +62,6 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		tokenStr := strings.TrimPrefix(authorisation, "Bearer ")
 
 		token, err := validateToken(tokenStr)
-		fmt.Println("err:", err) // ← add this
-		fmt.Println("valid:", token.Valid)
 		if err != nil || !token.Valid {
 			w.WriteHeader(http.StatusUnauthorized)
 			fmt.Fprintf(w, "It is not a valid Token")
