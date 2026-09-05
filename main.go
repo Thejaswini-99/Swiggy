@@ -26,6 +26,7 @@ func main() {
 
 	http.HandleFunc("/register", corsMiddleware(rateLimitMiddleware(register)))
 	http.HandleFunc("/login", corsMiddleware(rateLimitMiddleware(login)))
+	http.HandleFunc("/logout", corsMiddleware(rateLimitMiddleware(authMiddleware(logout))))
 	http.ListenAndServe(":8080", nil)
 
 }
